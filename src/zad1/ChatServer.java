@@ -107,7 +107,11 @@ public class ChatServer extends Thread{
         System.out.println("Server stopped");
     }
 
+    String request="";
+
     private void serviceRequest(SocketChannel clientSocketChanel) {
+
+        String time = getTime();
 
         if (!clientSocketChanel.isOpen())
             return;
@@ -115,60 +119,53 @@ public class ChatServer extends Thread{
         messageFromClient.setLength(0);
         byteBuffer.clear();
         try {
-            readLoop:
-            while (true) {
 
-                int n = clientSocketChanel.read(byteBuffer);
-                if (n > 0) {
+            while ( (clientSocketChanel.read(byteBuffer)>0)) {
+
                     byteBuffer.flip();
                     CharBuffer cbuf = charset.decode(byteBuffer);
+                    messageFromClient.append(cbuf);
+                    request=messageFromClient.toString();
 
-                    while(cbuf.hasRemaining()) {
-                        char c = cbuf.get();
-                        if (c == '\r' || c == '\n')
-                            break readLoop;
-                        messageFromClient.append(c);
-                    }
+            }
+            for(String req: request.split("\\n")) {
+
+                String[] request_line = req.split("\\s+");
+
+                if (request_line[0].equals("bye")) {
+                    serwerLog.add(time + " " + clients.get(clientSocketChanel.socket().getInetAddress().toString().substring(1) + ":" + clientSocketChanel.socket().getPort()) + " logged out");
+
+                    for (SocketChannel socketChannel : clientsSockets.values())
+                        writeResp(socketChannel, clients.get(clientSocketChanel.socket().getInetAddress().toString().substring(1) + ":" + clientSocketChanel.socket().getPort()) + " logged out");
+
+                    writeResp(clientSocketChanel,"$");
+                    clientsSockets.remove(clientSocketChanel.socket().getInetAddress().toString().substring(1) + ":" + clientSocketChanel.socket().getPort());
+
+                    clientSocketChanel.close();
+                    clientSocketChanel.socket().close();
+
+                } else if (request_line[0].equals("login")) {
+
+                    String clientId = clientSocketChanel.socket().getInetAddress().toString().substring(1) + ":" + clientSocketChanel.socket().getPort();
+                    clients.put(clientId, request_line[1]);
+                    clientsSockets.put(clientId, clientSocketChanel);
+
+                    writeResp(clientSocketChanel, "logged in");
+                    serwerLog.add(time + " " + request_line[1] + " logged in");
+
+                    for (SocketChannel socketChannel : clientsSockets.values())
+                        writeResp(socketChannel, clients.get(clientSocketChanel.socket().getInetAddress().toString().substring(1) + ":" + clientSocketChanel.socket().getPort()) + " logged in");
+
+
+                } else {
+                    serwerLog.add(time + " " + clients.get(clientSocketChanel.socket().getInetAddress().toString().substring(1) + ":" + clientSocketChanel.socket().getPort()) + ": " + req);
+
+                    for (SocketChannel socketChannel : clientsSockets.values())
+                        writeResp(socketChannel, clients.get(clientSocketChanel.socket().getInetAddress().toString().substring(1) + ":" + clientSocketChanel.socket().getPort()) + ": " + req);
+
                 }
             }
 
-            String req = messageFromClient.toString();
-            String [] request = req.split(" ");
-
-            if (req.equals("bye")) {
-                serwerLog.add(getDate()+ " "+ clients.get(clientSocketChanel.socket().getInetAddress().toString().substring(1)+ ":"+clientSocketChanel.socket().getPort())+ " logged out");
-
-                for(SocketChannel socketChannel: clientsSockets.values()) {
-                    writeResp(socketChannel, clients.get(clientSocketChanel.socket().getInetAddress().toString().substring(1)+ ":"+clientSocketChanel.socket().getPort())+ " logged out");
-                }
-
-                clientsSockets.remove(clientSocketChanel.socket().getInetAddress().toString().substring(1)+ ":"+clientSocketChanel.socket().getPort());
-
-                clientSocketChanel.close();
-                clientSocketChanel.socket().close();
-            }
-            else if (request[0].equals("login"))  {
-
-                String clientId = clientSocketChanel.socket().getInetAddress().toString().substring(1)+ ":"+clientSocketChanel.socket().getPort();
-                clients.put(clientId,request[1]);
-                clientsSockets.put(clientId,clientSocketChanel);
-
-                writeResp(clientSocketChanel,"logged in");
-                serwerLog.add(getDate()+ " "+ request[1]+ " logged in");
-
-                for(SocketChannel socketChannel: clientsSockets.values()) {
-                    writeResp(socketChannel, clients.get(clientSocketChanel.socket().getInetAddress().toString().substring(1)+ ":"+clientSocketChanel.socket().getPort())+ " logged in");
-                }
-
-            }
-
-            else {
-                serwerLog.add(getDate()+ " " +clients.get(clientSocketChanel.socket().getInetAddress().toString().substring(1)+ ":"+clientSocketChanel.socket().getPort()) + ": "+ req);
-
-                for(SocketChannel socketChannel: clientsSockets.values()) {
-                    writeResp(socketChannel, clients.get(clientSocketChanel.socket().getInetAddress().toString().substring(1)+ ":"+clientSocketChanel.socket().getPort())+ ": "+ req);
-                }
-            }
 
         } catch (Exception exc) {
             exc.printStackTrace();
@@ -189,7 +186,7 @@ public class ChatServer extends Thread{
         clientSocketChanel.write(buf);
     }
 
-    public String getDate(){
+    public String getTime(){
         DateFormat sdf = new SimpleDateFormat("HH:mm:ss.SSS");
 
         Calendar cal = Calendar.getInstance();

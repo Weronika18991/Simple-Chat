@@ -18,7 +18,11 @@ public class ChatClientTask extends FutureTask<String> {
 
     ChatClientTask(ChatClient client,List<String> msgs, int wait){
         super(()->{
+            if(wait != 0)
+                Thread.sleep(wait);
+
             client.login();
+
             if(wait != 0)
                 Thread.sleep(wait);
 
@@ -30,7 +34,9 @@ public class ChatClientTask extends FutureTask<String> {
 
             if(wait != 0)
                 Thread.sleep(wait);
+
             client.logout();
+
             if(wait != 0)
                 Thread.sleep(wait);
             return client.getChatView();

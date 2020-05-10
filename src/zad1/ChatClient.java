@@ -26,7 +26,9 @@ public class ChatClient {
     Charset charset = StandardCharsets.UTF_8;
     ByteBuffer serverResponseByteBuffer;
     CharBuffer serverResponseCharBuffer;
+    StringBuffer serverResponseStringBuffer;
     List<String> chatView;
+    boolean lastMessage=false;
 
 
     public ChatClient(String host, int port, String id) {
@@ -35,6 +37,8 @@ public class ChatClient {
         this.id=id;
         serverResponseByteBuffer = ByteBuffer.allocate(2048);
         chatView= new ArrayList<>();
+        serverResponseStringBuffer=new StringBuffer();
+        serverResponseStringBuffer.append("=== "+id+" chat view\n");
 
         try {
             channel = SocketChannel.open();
@@ -66,6 +70,16 @@ public class ChatClient {
                     } else {
                         serverResponseByteBuffer.flip();
                         serverResponseCharBuffer = charset.decode(serverResponseByteBuffer);
+
+                        while (serverResponseCharBuffer.hasRemaining()) {
+                            char c = serverResponseCharBuffer.get();
+                            if (c == '$') {
+                                lastMessage = true;
+                                return;
+                            }
+                            serverResponseStringBuffer.append(c);
+                        }
+
                         chatView.add(serverResponseCharBuffer.toString());
                     }
                 }
@@ -79,30 +93,16 @@ public class ChatClient {
 
     public void login(){
 
-        System.out.println("Client:  "+id+ " login");
-        String loginMess= "login "+ id+ "\n";
-        try {
-            channel.write(charset.encode(loginMess));
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        send("login "+ id);
     }
 
     public void logout(){
-        System.out.println("Client:  "+id+ " bye" );
-        String logoutMess= "bye"+ "\n";
-        try {
-            channel.write(charset.encode(logoutMess));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
 
+        send("bye");
     }
 
     public void send(String req){
 
-        System.out.println("Client:  "+id+ " " +req);
         CharBuffer clientMess = CharBuffer.wrap(req+ "\n");
 
         try {
@@ -116,12 +116,17 @@ public class ChatClient {
 
     public String getChatView(){
 
-        String chatview="=== "+id+" chat view\n";
-
-        for(String s: chatView){
-            chatview+=s;
+        while (true) {
+            if(lastMessage) {
+                return serverResponseStringBuffer.toString();
+            }else{
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
         }
-        return chatview;
     }
 
 
